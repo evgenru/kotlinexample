@@ -1,6 +1,7 @@
 package ru.skillbranch.kotlinexample
 
 import androidx.annotation.VisibleForTesting
+import ru.skillbranch.kotlinexample.User.Factory.fullNameToPair
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -10,7 +11,7 @@ class User private constructor(
     private val lastName: String?,
     email: String? = null,
     rawPhone: String? = null,
-    meta: Map<String, Any>? = null
+    private var meta: Map<String, Any>? = null
 ) {
     val fullName: String = listOfNotNull(firstName, lastName)
         .joinToString(" ")
@@ -36,9 +37,13 @@ class User private constructor(
         }
         get() = _login!!
 
-    private val salt: String by lazy {
-        ByteArray(16).also { SecureRandom().nextBytes(it) }.toString()
-    }
+    private var salt: String = ""
+        get() {
+            if (field.isBlank()) {
+                field = ByteArray(16).also { SecureRandom().nextBytes(it) }.toString()
+            }
+            return field
+        }
 
     private lateinit var passwordHash: String
 
@@ -64,6 +69,18 @@ class User private constructor(
         passwordHash = encrypt(code)
         accessCode = code
         sendAccessCodeToUser(rawPhone, code)
+    }
+
+    private constructor(
+        firstName: String,
+        lastName: String?,
+        email: String? = null,
+        salt: String,
+        passwordHash: String,
+        phone: String? = null
+    ) : this(firstName, lastName, email, phone, mapOf("src" to "csv")) {
+        this.salt = salt
+        this.passwordHash = passwordHash
     }
 
     init {
@@ -120,43 +137,61 @@ class User private constructor(
         println("... sending access code: $code on $phone")
     }
 
-    private fun String.md5(): String {
-        val md = MessageDigest.getInstance("MD5")
-        val digest = md.digest(toByteArray())
-        val hexString = BigInteger(1, digest).toString(16)
-        return hexString.padStart(32, '0')
-    }
-
     companion object Factory {
 
         fun makeUser(
             fullName: String,
-            email:String? = null,
+            email: String? = null,
             password: String? = null,
             phone: String? = null
-        ):User{
+        ): User {
             val (firstName, lastName) = fullName.fullNameToPair()
 
             return when {
                 !phone.isNullOrBlank() -> User(firstName, lastName, phone)
-                !email.isNullOrBlank() && !password.isNullOrBlank() -> User(firstName, lastName, email,password)
+                !email.isNullOrBlank() && !password.isNullOrBlank() -> User(
+                    firstName,
+                    lastName,
+                    email,
+                    password
+                )
                 else -> throw IllegalArgumentException("Email or phone must not be null or blank")
             }
         }
 
+        fun makeUser(
+            fullName: String,
+            email: String? = null,
+            salt: String,
+            passwordHash: String,
+            phone: String? = null
+        ): User {
+            val (firstName, lastName) = fullName.fullNameToPair()
+            return User(firstName, lastName, email, salt, passwordHash, phone)
+        }
+
         private fun String.fullNameToPair(): Pair<String, String?> {
             return this.split(" ")
-                .filter{ it.isNotBlank() }
+                .filter { it.isNotBlank() }
                 .run {
-                    when(size){
+                    when (size) {
                         1 -> first() to null
                         2 -> first() to last()
-                        else -> throw IllegalArgumentException("Fullname must be only first name " +
-                                "and last name, current split result ${this@fullNameToPair}")
+                        else -> throw IllegalArgumentException(
+                            "Fullname must be only first name " +
+                                    "and last name, current split result ${this@fullNameToPair}"
+                        )
                     }
                 }
 
         }
-    }
 
+    }
+}
+
+fun String.md5(): String {
+    val md = MessageDigest.getInstance("MD5")
+    val digest = md.digest(toByteArray())
+    val hexString = BigInteger(1, digest).toString(16)
+    return hexString.padStart(32, '0')
 }

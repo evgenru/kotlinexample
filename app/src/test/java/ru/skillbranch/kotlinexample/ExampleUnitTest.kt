@@ -184,4 +184,30 @@ class ExampleUnitTest {
         Assert.assertNotEquals(oldAccess, user.accessCode!!)
         Assert.assertEquals(expectedInfo, successResult)
     }
+
+    @Test
+    fun importUser() {
+        val holder = UserHolder
+
+        val password = "123"
+        val salt = "B@7591083d"
+        val passwordHash = salt.plus(password).md5()
+
+        val user = holder.importUsers(listOf(" John Doe ;JohnDoe@unknow.com; $salt:$passwordHash;;"))
+
+        val expectedInfo = """
+            firstName: John
+            lastName: Doe
+            login: johndoe@unknow.com
+            fullName: John Doe
+            initials: J D
+            email: JohnDoe@unknow.com
+            phone: null
+            meta: {src=csv}
+        """.trimIndent()
+
+        val successResult =  holder.loginUser("johndoe@unknow.com", password)
+
+        Assert.assertEquals(expectedInfo, successResult)
+    }
 }
