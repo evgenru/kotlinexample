@@ -1,4 +1,4 @@
-package ru.skillbranch.kotlinexample.extentions
+package ru.skillbranch.kotlinexample.extensions
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Test
